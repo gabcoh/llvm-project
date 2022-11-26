@@ -201,6 +201,8 @@ namespace llvm {
   ///
   FunctionPass *createDefaultPBQPRegisterAllocator();
 
+  FunctionPass *createSimpleRegisterAllocator();
+
   /// PrologEpilogCodeInserter - This pass inserts prolog and epilog code,
   /// and eliminates abstract frame references.
   extern char &PrologEpilogCodeInserterID;

@@ -381,6 +381,7 @@ void initializeRedundantDbgInstEliminationPass(PassRegistry&);
 void initializeRegAllocEvictionAdvisorAnalysisPass(PassRegistry &);
 void initializeRegAllocFastPass(PassRegistry&);
 void initializeRegAllocScoringPass(PassRegistry &);
+void initializeRegAllocSimplePass(PassRegistry&);
 void initializeRegBankSelectPass(PassRegistry&);
 void initializeRegToMemLegacyPass(PassRegistry&);
 void initializeRegUsageInfoCollectorPass(PassRegistry&);

@@ -1378,7 +1378,8 @@ FunctionPass *TargetPassConfig::createRegAllocPass(bool Optimized) {
 
 bool TargetPassConfig::addRegAssignAndRewriteFast() {
   if (RegAlloc != (RegisterRegAlloc::FunctionPassCtor)&useDefaultRegisterAllocator &&
-      RegAlloc != (RegisterRegAlloc::FunctionPassCtor)&createFastRegisterAllocator)
+      RegAlloc != (RegisterRegAlloc::FunctionPassCtor)&createFastRegisterAllocator &&
+      RegAlloc != (RegisterRegAlloc::FunctionPassCtor)&createSimpleRegisterAllocator)
     report_fatal_error("Must use fast (default) register allocator for unoptimized regalloc.");
 
   addPass(createRegAllocPass(false));
