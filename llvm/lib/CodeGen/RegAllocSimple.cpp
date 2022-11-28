@@ -58,6 +58,7 @@ namespace {
     using RegisterSet = SmallSet<Register, 8>;
     IndexedMap<Register, VirtReg2IndexFunctor> LiveVirtRegs;
     RegisterSet LivePhysRegs;
+    RegisterSet NonPreferredRegisters;
     IndexedMap<int, VirtReg2IndexFunctor> SpillMap;
 
   public:
@@ -126,6 +127,15 @@ namespace {
             break;
           }
         }
+
+        // TODO: This should not disqualify the register. Or maybe it doesn't make a difference? Will cause an additional spill either way?
+        for (Register NonPreferredRegister : NonPreferredRegisters) {
+          if (TRI->regsOverlap(NonPreferredRegister, PhysReg)) {
+            PhysRegIsAvailable = false;
+            break;
+          }
+        }
+
         if (PhysRegIsAvailable) {
           return PhysReg;
         }
@@ -154,6 +164,7 @@ namespace {
           if (PhysReg != Register() && !MO.getParent()->readsVirtualRegister(VirtReg)) {
             // TODO: What should IsKill be here?
             int StackSlot = allocateStackSlot(PhysReg);
+            NumStores++;
             TII->storeRegToStackSlot(*MBB, MI, PhysReg, false, StackSlot, TRC, TRI);
             LiveVirtRegs[VirtReg] = Register();
             LivePhysRegs.erase(PhysReg);
@@ -166,6 +177,7 @@ namespace {
 
       if (MO.isUse()) {
         int StackSlot = allocateStackSlot(Reg);
+        NumLoads++;
         TII->loadRegFromStackSlot(*MBB, MI, PhysReg, StackSlot, TRC, TRI);
       }
 
@@ -212,6 +224,7 @@ namespace {
               const TargetRegisterClass *TRC = MRI->getRegClass(VirtReg);
               int StackSlot = allocateStackSlot(VirtReg);
               // TODO: What should isKill be here? (Note: it is apparently possible to find uses of virtual registers by looking at MRI)
+              NumStores++;
               TII->storeRegToStackSlot(*MI.getParent(), MIt, PhysReg, false, StackSlot, TRC, TRI);
               LiveVirtRegs[VirtReg] = Register();
             }
@@ -233,6 +246,7 @@ namespace {
                 int StackSlot = allocateStackSlot(VirtReg);
                 // TODO: What should isKill be here? (Note: it is apparently
                 // possible to find uses of virtual registers by looking at MRI)
+                NumStores++;
                 TII->storeRegToStackSlot(*MI.getParent(), MIt, PhysReg, false,
                                          StackSlot, TRC, TRI);
                 LiveVirtRegs[VirtReg] = Register();
@@ -276,8 +290,23 @@ namespace {
     void allocateBasicBlock(MachineBasicBlock &MBB) {
       // XXX: allocate each instruction
       // XXX: spill all live registers at the end
+      NonPreferredRegisters.clear();
+      LivePhysRegs.clear();
       LiveVirtRegs.clear();
       LiveVirtRegs.resize(MBB.getParent()->getRegInfo().getNumVirtRegs());
+
+      for (MachineBasicBlock::iterator MIt = MBB.begin(); MIt != MBB.end();
+           MIt++) {
+        for (MachineOperand &MO : MIt->operands()) {
+          if (MO.isReg() && MO.getReg().isPhysical()) {
+            NonPreferredRegisters.insert(MO.getReg());
+          }
+        }
+      }
+
+      for (const MachineBasicBlock::RegisterMaskPair &RegPair : MBB.liveins()) {
+        LivePhysRegs.insert(RegPair.PhysReg);
+      }
 
       for (MachineBasicBlock::iterator MIt = MBB.begin(); MIt != MBB.end(); MIt++) {
         allocateInstruction(*MIt, MIt);
@@ -296,6 +325,7 @@ namespace {
           // TODO: What should IsKill be here?
           // TODO: Should LiveVirtRegs map operands somehow?
           int StackSlot = allocateStackSlot(Reg);
+          NumStores++;
           TII->storeRegToStackSlot(MBB, MI, LiveVirtRegs[Reg], false,
                                    StackSlot, MRI->getRegClass(Reg), TRI);
         }
